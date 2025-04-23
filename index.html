@@ -348,9 +348,8 @@
         }
         
         .invalid-batch {
-        color: var(--error-color) !important;
-        font-weight: bold !important;
-        background-color: #ffebee !important;
+            color: var(--error-color);
+            font-weight: bold;
         }
         
         .error-field {
@@ -1728,28 +1727,26 @@
         }
         
         // Group batch sizes into counts (e.g. [10, 10, 5] becomes "2 × 10kg, 1 × 5kg")
-function groupBatchSizes(batches, minBatchSize, maxBatchSize, forPDF = false) {
-    const groups = {};
-    batches.forEach(size => {
-        const key = size.toFixed(2) + 'kg';
-        groups[key] = (groups[key] || 0) + 1;
-    });
-    
-    return Object.entries(groups).map(([size, count]) => {
-        const sizeValue = parseFloat(size.replace('kg', ''));
-        const isInvalid = sizeValue < minBatchSize || sizeValue > maxBatchSize;
-        
-        if (forPDF) {
-            // For PDF, we'll handle styling differently
-            return `${count} × ${size}`;
-        } else {
-            // For HTML, use span with class
-            return isInvalid 
-                ? `<span class="invalid-batch">${count} × ${size}</span>`
-                : `${count} × ${size}`;
+        function groupBatchSizes(batches, minBatchSize, maxBatchSize, forPDF = false) {
+            const groups = {};
+            batches.forEach(size => {
+                const key = size.toFixed(2) + 'kg';
+                groups[key] = (groups[key] || 0) + 1;
+            });
+            
+            return Object.entries(groups).map(([size, count]) => {
+                const sizeValue = parseFloat(size.replace('kg', ''));
+                const isInvalid = sizeValue < minBatchSize || sizeValue > maxBatchSize;
+                
+                if (forPDF) {
+                    return `${count} × ${size}`;
+                } else {
+                    return isInvalid 
+                        ? `<span class="invalid-batch">${count} × ${size}</span>`
+                        : `${count} × ${size}`;
+                }
+            }).join(', ');
         }
-    }).join(', ');
-}
         
         // Clean batch string for PDF export (remove HTML tags)
         function cleanBatchString(batchString) {
@@ -2473,65 +2470,42 @@ function groupBatchSizes(batches, minBatchSize, maxBatchSize, forPDF = false) {
             });
             
             doc.autoTable({
-    startY: currentY,
-    head: [
-        [
-            { content: 'Green Coffee', styles: { fontStyle: 'bold', halign: 'center' } },
-            { content: 'Green Quantity', styles: { fontStyle: 'bold', halign: 'center' } },
-            { content: 'Roasted Output', styles: { fontStyle: 'bold', halign: 'center' } },
-            { content: 'Batches', styles: { fontStyle: 'bold', halign: 'center' } },
-            { content: 'Batch Sizes', styles: { fontStyle: 'bold', halign: 'center' } },
-            { content: 'Roasting Time', styles: { fontStyle: 'bold', halign: 'center' } }
-        ]
-    ],
-    body: planTableData,
-    theme: 'grid',
-    headStyles: { 
-        fillColor: headerColor,
-        textColor: primaryColor,
-        fontStyle: 'bold',
-        fontSize: headerFontSize
-    },
-    bodyStyles: {
-        textColor: primaryColor,
-        fontSize: fontSize
-    },
-    styles: {
-        cellPadding: cellPadding,
-        overflow: 'linebreak',
-        halign: 'left',
-        valign: 'middle'
-    },
-    columnStyles: {
-        0: { cellWidth: 'auto' },
-        1: { cellWidth: 'auto', halign: 'right' },
-        2: { cellWidth: 'auto', halign: 'right' },
-        3: { cellWidth: 'auto', halign: 'right' },
-        4: { cellWidth: 'auto' },
-        5: { cellWidth: 'auto', halign: 'right' }
-    },
-    didParseCell: function(data) {
-        // Check if we're in the batch sizes column (index 4) and if any batch is invalid
-        if (data.column.index === 4) {
-            const batches = data.cell.raw.split(', ');
-            const hasInvalid = batches.some(batch => {
-                const sizeMatch = batch.match(/(\d+\.?\d*) × (\d+\.?\d*)kg/);
-                if (sizeMatch) {
-                    const size = parseFloat(sizeMatch[2]);
-                    return size < machine.minBatchSize || size > machine.batchSize;
-                }
-                return false;
+                startY: currentY,
+                head: [
+                    [
+                        { content: 'Client Name', styles: { fontStyle: 'bold', halign: 'center' } },
+                        { content: 'Roasted Coffee', styles: { fontStyle: 'bold', halign: 'center' } },
+                        { content: 'Volume Ordered', styles: { fontStyle: 'bold', halign: 'center' } },
+                        { content: 'Custom Coffee', styles: { fontStyle: 'bold', halign: 'center' } }
+                    ]
+                ],
+                body: saleOrderData,
+                theme: 'grid',
+                headStyles: { 
+                    fillColor: headerColor,
+                    textColor: primaryColor,
+                    fontStyle: 'bold',
+                    fontSize: headerFontSize
+                },
+                bodyStyles: {
+                    textColor: primaryColor,
+                    fontSize: fontSize
+                },
+                styles: {
+                    cellPadding: cellPadding,
+                    overflow: 'linebreak',
+                    halign: 'left',
+                    valign: 'middle'
+                },
+                columnStyles: {
+                    0: { cellWidth: 'auto' },
+                    1: { cellWidth: 'auto' },
+                    2: { cellWidth: 'auto', halign: 'right' },
+                    3: { cellWidth: 'auto', halign: 'center' }
+                },
+                margin: { left: 14, right: 14 },
+                tableWidth: 'auto'
             });
-            
-            if (hasInvalid) {
-                data.cell.styles.textColor = [255, 0, 0]; // Red color
-                data.cell.styles.fontStyle = 'bold';
-            }
-        }
-    },
-    margin: { left: 14, right: 14 },
-    tableWidth: 'auto'
-});
             
             currentY = doc.lastAutoTable.finalY + 10;
             
@@ -2700,29 +2674,29 @@ function groupBatchSizes(batches, minBatchSize, maxBatchSize, forPDF = false) {
                     currentY += 5;
                     
                     const planTableData = [];
-// Only show green coffees with quantity > 0
-for (const [coffee, qty] of Object.entries(planData.details)) {
-    if (qty > 0) {
-        const batches = planData.batches[coffee];
-        const batchSizes = cleanBatchString(planData.batchDetails[coffee] || 'N/A');
-        const roastingTime = batches * AVERAGE_ROAST_TIME_PER_BATCH;
-        const roastedOutput = planData.roastedOutput[coffee] || 0;
-        
-        // Display the original name for non-custom components, modified name for custom
-        const displayName = coffee.includes(' - ') ? 
-            `${coffee.split(' - ')[0]} - ${coffee.split(' - ')[1]}` : 
-            coffee;
-        
-        planTableData.push([
-            displayName,
-            `${qty.toFixed(2)} kg`,
-            `${roastedOutput.toFixed(2)} kg`,
-            batches,
-            batchSizes,
-            formatMinutesToHours(roastingTime)
-        ]);
-    }
-}
+                    // Only show green coffees with quantity > 0
+                    for (const [coffee, qty] of Object.entries(planData.details)) {
+                        if (qty > 0) {
+                            const batches = planData.batches[coffee];
+                            const batchSizes = cleanBatchString(planData.batchDetails[coffee] || 'N/A');
+                            const roastingTime = batches * AVERAGE_ROAST_TIME_PER_BATCH;
+                            const roastedOutput = planData.roastedOutput[coffee] || 0;
+                            
+                            // Display the original name for non-custom components, modified name for custom
+                            const displayName = coffee.includes(' - ') ? 
+                                `${coffee.split(' - ')[0]} - ${coffee.split(' - ')[1]}` : 
+                                coffee;
+                            
+                            planTableData.push([
+                                displayName,
+                                `${qty.toFixed(2)} kg`,
+                                `${roastedOutput.toFixed(2)} kg`,
+                                batches,
+                                batchSizes,
+                                formatMinutesToHours(roastingTime)
+                            ]);
+                        }
+                    }
                     
                     doc.autoTable({
                         startY: currentY,
