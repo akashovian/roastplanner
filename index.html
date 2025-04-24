@@ -347,11 +347,6 @@
             gap: 15px;
         }
         
-        .invalid-batch {
-            color: var(--error-color);
-            font-weight: bold;
-        }
-        
         .error-field {
             border: 1px solid var(--error-color) !important;
         }
@@ -1692,7 +1687,7 @@
                 return {
                     count: 1,
                     batches: [totalQty],
-                    batchDetails: `1 × ${totalQty.toFixed(2)}kg`
+                    batchDetails: `1 × ${totalQty.toFixed(2)}kg*`
                 };
             }
             
@@ -1739,11 +1734,9 @@
                 const isInvalid = sizeValue < minBatchSize || sizeValue > maxBatchSize;
                 
                 if (forPDF) {
-                    return `${count} × ${size}`;
+                    return isInvalid ? `${count} × ${size}*` : `${count} × ${size}`;
                 } else {
-                    return isInvalid 
-                        ? `<span class="invalid-batch">${count} × ${size}</span>`
-                        : `${count} × ${size}`;
+                    return isInvalid ? `${count} × ${size}*` : `${count} × ${size}`;
                 }
             }).join(', ');
         }
