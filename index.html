@@ -131,7 +131,7 @@
         }
         
         .hidden {
-            display: none;
+            display: none !important;
         }
         
         .form-group {
@@ -551,8 +551,38 @@
                 'saleOrdersSection'
             ];
             
+            let errorMessages = [];
+            let hasErrors = false;
+            
+            // First validate all sections
             sections.forEach(sectionId => {
-                lockSection(sectionId);
+                const section = document.getElementById(sectionId);
+                const inputs = section.querySelectorAll('input[required], select[required]');
+                
+                inputs.forEach(input => {
+                    if (!input.value) {
+                        hasErrors = true;
+                        input.style.borderColor = 'var(--error-color)';
+                        const label = input.closest('.form-group')?.querySelector('label')?.textContent || 'Field';
+                        if (!errorMessages.includes(label)) {
+                            errorMessages.push(label);
+                        }
+                    } else {
+                        input.style.borderColor = '';
+                    }
+                });
+            });
+            
+            // Show consolidated error message if any
+            if (hasErrors) {
+                alert('Please complete all required fields in the following sections:\n\n- ' + 
+                    errorMessages.join('\n- '));
+                return;
+            }
+            
+            // If validation passed, lock all sections
+            sections.forEach(sectionId => {
+                lockSection(sectionId, true); // Pass true to skip validation
             });
             
             // Also lock all roasted coffees if any exist
@@ -582,25 +612,28 @@
             }
         }
         
-        // Lock a section
-        function lockSection(sectionId) {
+        // Lock a section (skipValidation parameter added)
+        function lockSection(sectionId, skipValidation = false) {
             const section = document.getElementById(sectionId);
-            const inputs = section.querySelectorAll('input[required], select[required]');
-            let isValid = true;
             
-            // Validate required fields
-            inputs.forEach(input => {
-                if (!input.value) {
-                    isValid = false;
-                    input.style.borderColor = 'var(--error-color)';
-                } else {
-                    input.style.borderColor = '';
+            if (!skipValidation) {
+                const inputs = section.querySelectorAll('input[required], select[required]');
+                let isValid = true;
+                
+                // Validate required fields
+                inputs.forEach(input => {
+                    if (!input.value) {
+                        isValid = false;
+                        input.style.borderColor = 'var(--error-color)';
+                    } else {
+                        input.style.borderColor = '';
+                    }
+                });
+                
+                if (!isValid) {
+                    alert('Please enter all required fields');
+                    return;
                 }
-            });
-            
-            if (!isValid) {
-                alert('Please enter all required fields');
-                return;
             }
             
             // Lock the section
@@ -733,24 +766,32 @@
             const container = document.getElementById('roastedCoffeeInputs');
             const cards = container.querySelectorAll('.roasted-coffee-card');
             
+            const lockAllBtn = document.querySelector('#roastedCoffeeSection .lock-btn');
+            const unlockAllBtn = document.querySelector('#roastedCoffeeSection .unlock-btn');
+            
+            if (!lockAllBtn || !unlockAllBtn) return;
+            
             if (cards.length === 0) {
-                document.querySelector('#roastedCoffeeSection .lock-btn').classList.add('hidden');
-                document.querySelector('#roastedCoffeeSection .unlock-btn').classList.add('hidden');
+                lockAllBtn.classList.add('hidden');
+                unlockAllBtn.classList.add('hidden');
                 return;
             }
             
+            // Check lock states
             const allLocked = Array.from(cards).every(card => card.classList.contains('locked'));
             const allUnlocked = Array.from(cards).every(card => !card.classList.contains('locked'));
             
+            // Show/hide buttons based on state
             if (allLocked) {
-                document.querySelector('#roastedCoffeeSection .lock-btn').classList.remove('hidden');
-                document.querySelector('#roastedCoffeeSection .unlock-btn').classList.remove('hidden');
+                lockAllBtn.classList.add('hidden');
+                unlockAllBtn.classList.remove('hidden');
             } else if (allUnlocked) {
-                document.querySelector('#roastedCoffeeSection .lock-btn').classList.remove('hidden');
-                document.querySelector('#roastedCoffeeSection .unlock-btn').classList.add('hidden');
+                lockAllBtn.classList.remove('hidden');
+                unlockAllBtn.classList.add('hidden');
             } else {
-                document.querySelector('#roastedCoffeeSection .lock-btn').classList.remove('hidden');
-                document.querySelector('#roastedCoffeeSection .unlock-btn').classList.remove('hidden');
+                // Mixed state - show both buttons
+                lockAllBtn.classList.remove('hidden');
+                unlockAllBtn.classList.remove('hidden');
             }
         }
         
@@ -1682,47 +1723,116 @@
         function calculateOptimalBatches(totalQty, minBatchSize, maxBatchSize) {
             if (totalQty <= 0) return { count: 0, batches: [], batchDetails: [] };
             
-            // Allow the last batch to be smaller than minBatchSize if no other option
-            if (totalQty < minBatchSize) {
-                return {
-                    count: 1,
-                    batches: [totalQty],
-                    batchDetails: `1 × ${totalQty.toFixed(2)}kg*`
-                };
-            }
+            // First try to find a configuration where all batches are within constraints
+            let bestSolution = null;
             
-            const batches = [];
+            // Try different approaches to find the best batch configuration
+            const possibleSolutions = [];
+            
+            // Approach 1: Standard approach (maximize batch sizes)
+            const standardBatches = [];
             let remaining = totalQty;
-            
             while (remaining > 0) {
                 let batchSize = Math.min(maxBatchSize, remaining);
-                
-                // If the remaining amount is less than minBatchSize, try to merge with previous batch
-                if (batchSize < minBatchSize && batches.length > 0) {
-                    const lastBatchIndex = batches.length - 1;
-                    const mergedBatch = batches[lastBatchIndex] + batchSize;
-                    
-                    // Only merge if the merged batch doesn't exceed maxBatchSize
-                    if (mergedBatch <= maxBatchSize) {
-                        batches[lastBatchIndex] = mergedBatch;
-                        remaining = 0;
-                        break;
-                    }
-                }
-                
-                batches.push(batchSize);
+                standardBatches.push(batchSize);
                 remaining -= batchSize;
             }
             
-            return {
-                count: batches.length,
-                batches: batches,
-                batchDetails: groupBatchSizes(batches, minBatchSize, maxBatchSize)
-            };
+            // Check if this solution meets all constraints
+            const standardValid = standardBatches.every(size => size >= minBatchSize);
+            if (standardValid) {
+                possibleSolutions.push({
+                    count: standardBatches.length,
+                    batches: standardBatches,
+                    batchDetails: {
+                        sizes: standardBatches,
+                        min: minBatchSize,
+                        max: maxBatchSize
+                    }
+                });
+            }
+            
+            // Approach 2: Balanced approach (try to make batches as equal as possible)
+            if (totalQty >= minBatchSize) {
+                const numBatches = Math.ceil(totalQty / maxBatchSize);
+                const balancedSize = totalQty / numBatches;
+                
+                // If the balanced size is >= minBatchSize, use it
+                if (balancedSize >= minBatchSize) {
+                    const balancedBatches = Array(numBatches).fill(balancedSize);
+                    possibleSolutions.push({
+                        count: numBatches,
+                        batches: balancedBatches,
+                        batchDetails: {
+                            sizes: balancedBatches,
+                            min: minBatchSize,
+                            max: maxBatchSize
+                        }
+                    });
+                }
+            }
+            
+            // Approach 3: Try to adjust the last batch to meet minBatchSize
+            if (standardBatches.length > 1 && standardBatches[standardBatches.length - 1] < minBatchSize) {
+                const adjustedBatches = [...standardBatches];
+                const lastBatch = adjustedBatches.pop();
+                const secondLastBatch = adjustedBatches.pop();
+                
+                // Try to merge the last two batches if possible
+                const mergedBatch = secondLastBatch + lastBatch;
+                if (mergedBatch <= maxBatchSize) {
+                    adjustedBatches.push(mergedBatch);
+                    possibleSolutions.push({
+                        count: adjustedBatches.length,
+                        batches: adjustedBatches,
+                        batchDetails: {
+                            sizes: adjustedBatches,
+                            min: minBatchSize,
+                            max: maxBatchSize
+                        }
+                    });
+                }
+            }
+            
+            // If we found valid solutions, pick the one with fewest batches
+            if (possibleSolutions.length > 0) {
+                bestSolution = possibleSolutions.reduce((best, current) => 
+                    current.count < best.count ? current : best
+                );
+            }
+            
+            // If no valid solution found (some batches will be below minBatchSize)
+            if (!bestSolution) {
+                // Allow the last batch to be smaller than minBatchSize if no other option
+                const batches = [];
+                remaining = totalQty;
+                
+                while (remaining > 0) {
+                    let batchSize = Math.min(maxBatchSize, remaining);
+                    batches.push(batchSize);
+                    remaining -= batchSize;
+                }
+                
+                bestSolution = {
+                    count: batches.length,
+                    batches: batches,
+                    batchDetails: {
+                        sizes: batches,
+                        min: minBatchSize,
+                        max: maxBatchSize
+                    }
+                };
+            }
+            
+            return bestSolution;
         }
         
         // Group batch sizes into counts (e.g. [10, 10, 5] becomes "2 × 10kg, 1 × 5kg")
-        function groupBatchSizes(batches, minBatchSize, maxBatchSize, forPDF = false) {
+        function groupBatchSizes(batchesInfo, forPDF = false) {
+            const batches = batchesInfo.sizes;
+            const minBatchSize = batchesInfo.min;
+            const maxBatchSize = batchesInfo.max;
+            
             const groups = {};
             batches.forEach(size => {
                 const key = size.toFixed(2) + 'kg';
@@ -1731,12 +1841,14 @@
             
             return Object.entries(groups).map(([size, count]) => {
                 const sizeValue = parseFloat(size.replace('kg', ''));
+                // Check if size is invalid (either below min or above max)
                 const isInvalid = sizeValue < minBatchSize || sizeValue > maxBatchSize;
                 
                 if (forPDF) {
                     return isInvalid ? `${count} × ${size}*` : `${count} × ${size}`;
                 } else {
-                    return isInvalid ? `${count} × ${size}*` : `${count} × ${size}`;
+                    // For HTML, we can use <sup> tags for better formatting
+                    return isInvalid ? `${count} × ${size}<sup>*</sup>` : `${count} × ${size}`;
                 }
             }).join(', ');
         }
@@ -2350,7 +2462,7 @@
                     for (const [coffee, qty] of Object.entries(planData.details)) {
                         if (qty > 0) {
                             const batches = planData.batches[coffee];
-                            const batchSizes = planData.batchDetails[coffee] || 'N/A';
+                            const batchSizes = groupBatchSizes(planData.batchDetails[coffee]) || 'N/A';
                             const roastingTime = batches * AVERAGE_ROAST_TIME_PER_BATCH;
                             const roastedOutput = planData.roastedOutput[coffee] || 0;
                             
@@ -2671,7 +2783,11 @@
                     for (const [coffee, qty] of Object.entries(planData.details)) {
                         if (qty > 0) {
                             const batches = planData.batches[coffee];
-                            const batchSizes = cleanBatchString(planData.batchDetails[coffee] || 'N/A');
+                            const batchSizes = cleanBatchString(groupBatchSizes({
+                                sizes: planData.batchDetails[coffee].sizes,
+                                min: machine.minBatchSize,
+                                max: machine.batchSize
+                            }, true) || 'N/A');
                             const roastingTime = batches * AVERAGE_ROAST_TIME_PER_BATCH;
                             const roastedOutput = planData.roastedOutput[coffee] || 0;
                             
